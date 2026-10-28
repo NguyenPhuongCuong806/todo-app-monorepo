@@ -42,10 +42,11 @@ jobs:
         ECR_REPOSITORY: todo-app-backend
         IMAGE_TAG: ${{ github.sha }}
       run: |
-        # Build a docker container and push it to ECR
         cd backend
         docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
         docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+        docker tag $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG $ECR_REGISTRY/$ECR_REPOSITORY:latest
+        docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
         cd ..
         sed -i 's|todo-app-backend:latest|todo-app-backend:'$IMAGE_TAG'|g' aws-eks.yaml
 
@@ -56,10 +57,11 @@ jobs:
         ECR_REPOSITORY: todo-app-frontend
         IMAGE_TAG: ${{ github.sha }}
       run: |
-        # Build a docker container and push it to ECR
         cd frontend
         docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
         docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+        docker tag $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG $ECR_REGISTRY/$ECR_REPOSITORY:latest
+        docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
         cd ..
         sed -i 's|todo-app-frontend:latest|todo-app-frontend:'$IMAGE_TAG'|g' aws-eks.yaml
 
