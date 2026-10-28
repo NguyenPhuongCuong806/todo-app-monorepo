@@ -1,28 +1,24 @@
 name: Deploy to EKS
 
 on:
-  push:
-    branches:
-      - master
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version tag (e.g., v1.0.1)'
+        required: true
+        type: string
+        default: 'v1.0.1'
 
 jobs:
   build-and-deploy:
-    name: Build and Deploy to EKS
+    name: Build and Push Docker Images
     runs-on: ubuntu-latest
 
     steps:
     - name: Checkout code
       uses: actions/checkout@v3
-
-    - name: Detect Changes
-      uses: dorny/paths-filter@v3
-      id: filter
       with:
-        filters: |
-          backend:
-            - 'backend/**'
-          frontend:
-            - 'frontend/**'
+        ref: ${{ inputs.version }}
 
     - name: Configure AWS credentials
       uses: aws-actions/configure-aws-credentials@v2
@@ -36,38 +32,23 @@ jobs:
       uses: aws-actions/amazon-ecr-login@v1
 
     - name: Build, tag, and push backend image to Amazon ECR
-      if: steps.filter.outputs.backend == 'true'
       env:
         ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
         ECR_REPOSITORY: todo-app-backend
-        IMAGE_TAG: ${{ github.sha }}
+        IMAGE_TAG: ${{ inputs.version }}
       run: |
+        # Build a docker container and push it to ECR
         cd backend
         docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
         docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
-        docker tag $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG $ECR_REGISTRY/$ECR_REPOSITORY:latest
-        docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
-        cd ..
-        sed -i 's|todo-app-backend:latest|todo-app-backend:'$IMAGE_TAG'|g' aws-eks.yaml
 
     - name: Build, tag, and push frontend image to Amazon ECR
-      if: steps.filter.outputs.frontend == 'true'
       env:
         ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
         ECR_REPOSITORY: todo-app-frontend
-        IMAGE_TAG: ${{ github.sha }}
+        IMAGE_TAG: ${{ inputs.version }}
       run: |
+        # Build a docker container and push it to ECR
         cd frontend
         docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
         docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
-        docker tag $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG $ECR_REGISTRY/$ECR_REPOSITORY:latest
-        docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
-        cd ..
-        sed -i 's|todo-app-frontend:latest|todo-app-frontend:'$IMAGE_TAG'|g' aws-eks.yaml
-
-    - name: Update kubeconfig
-      run: aws eks update-kubeconfig --name ${{ secrets.EKS_CLUSTER_NAME }} --region ${{ secrets.AWS_REGION }}
-
-    - name: Deploy to EKS
-      run: |
-        kubectl apply -f aws-eks.yaml
